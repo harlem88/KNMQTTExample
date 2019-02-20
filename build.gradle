@@ -1,0 +1,63 @@
+plugins {
+    id 'kotlin-multiplatform' version '1.3.21'
+}
+repositories {
+    mavenCentral()
+}
+
+def hostPreset = determinePreset()
+
+kotlin {
+
+    targets {
+        fromPreset(hostPreset, 'linux')
+
+        configure([linux]) {
+
+            compilations.main.cinterops {
+                libpahomqtt {
+                    switch (hostPreset) {
+                        case presets.linuxX64:
+                            includeDirs.headerFilterOnly '/usr/local/include', '/usr/local/lib'
+                            break
+                        case presets.linuxArm32Hfp:
+                            includeDirs.headerFilterOnly '/usr/local/include', '/var/eabi-chroot/usr/local/lib'
+                            break
+                    }
+                }
+            }
+
+            compilations.main.outputKinds('EXECUTABLE')
+            compilations.main.entryPoint = 'org.udoo.iot.simpsonhouse.main'
+        }
+    }
+    sourceSets {
+
+        linuxMain {
+            dependencies {
+//                implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-core-native:1.0.1'
+            }
+        }
+    }
+}
+
+private def determinePreset() {
+    def preset = kotlin.presets.linuxX64
+
+    if (project.hasProperty('buildType') && project.buildType == "arm") {
+        preset = kotlin.presets.linuxArm32Hfp
+    }
+    preset
+}
+
+task runProgram {
+    def buildType = 'RELEASE' // Change to 'DEBUG' to run application with debug symbols.
+    dependsOn kotlin.targets.linux.compilations.main.linkTaskName('EXECUTABLE', buildType)
+    doLast {
+        def programFile = kotlin.targets.linux.compilations.main.getBinary('EXECUTABLE', buildType)
+        exec {
+            executable programFile
+            args ''
+        }
+    }
+}

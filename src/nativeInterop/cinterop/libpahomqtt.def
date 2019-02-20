@@ -1,0 +1,18 @@
+headers = paho-mqtt/MQTTClient.h
+headerFilter = paho-mqtt/*
+
+compilerOpts.linux = -I/usr/local/include -I/usr/local/lib
+linkerOpts.linux_arm32_hfp = -L/var/eabi-chroot/usr/local/lib -lpaho-mqtt3c
+linkerOpts.linux = -L/usr/local/lib -L/usr/lib/x86_64-linux-gnu -lpaho-mqtt3c
+
+---
+
+static inline MQTTClient_connectOptions mqttClient_connectOptions_initializer() {
+    MQTTClient_connectOptions conn_opts = MQTTClient_connectOptions_initializer;
+    return conn_opts;
+}
+
+static inline MQTTClient_message mqttClient_message_initializer() {
+    MQTTClient_message message = MQTTClient_message_initializer;
+    return message;
+}
