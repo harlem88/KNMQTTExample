@@ -55,7 +55,7 @@ class SerialData(private val port: String) {
     fun read() : Future<ByteArray> ?{
         if (fd == -1) return null
 
-        return worker?.execute(TransferMode.UNSAFE, {fd}) {
+        return worker?.execute(TransferMode.SAFE, {fd}) {
 
             val bufferByteArray = ArrayList<Byte>()
 
@@ -80,7 +80,6 @@ class SerialData(private val port: String) {
 
                     reads = read(it, buffer, size.convert()).toInt()
                 }
-                println("reads ${bufferByteArray.toByteArray().stringFromUtf8()}")
                 bufferByteArray.toByteArray()
             }
         }

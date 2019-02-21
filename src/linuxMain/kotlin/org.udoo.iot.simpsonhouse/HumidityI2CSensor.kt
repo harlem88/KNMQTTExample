@@ -8,36 +8,59 @@ import platform.posix.fclose
 import platform.posix.fgets
 import platform.posix.fopen
 
-private const val fileName = "/sensors/temperature/temp1_input"
+private const val path = "/sys/class/i2c-dev/i2c-1/device/1-0040"
+private const val HumidityFileName = "$path/humidity1_input"
+private const val TemperatureFileName = "$path/temp1_input"
 
 object HumidityI2CSensor{
 
-    fun read() : Float?{
+    fun read() : Array<Float?>{
+        val values = Array<Float?>(2) {null}
+        val humidityFile = fopen(HumidityFileName, "r")
 
-        val file = fopen(fileName, "r")
-        if (file == null) {
-            println("cannot open input file $fileName")
-            return null
-        }
+        if (humidityFile == null) {
+            println("cannot open input file $HumidityFileName")
+        }else{
 
-        var value: Float? = null
+            try {
+                values[0] = memScoped {
+                    val bufferLength = 1024
+                    val buffer = allocArray<ByteVar>(bufferLength)
+                    val line = fgets(buffer, bufferLength, humidityFile)?.toKString()
 
-        try {
-            value = memScoped {
-                val bufferLength = 1024
-                val buffer = allocArray<ByteVar>(bufferLength)
-                val line = fgets(buffer, bufferLength, file)?.toKString()
-
-                if (line != null && line.isNotEmpty()) {
-                    val tmpValue = line.trim().toFloat() / 1000f
-                    println(" temp: $tmpValue")
-                    value
-                }else null
+                    toScaledNumber(line, 1000f)
+                }
+            } finally {
+                fclose(humidityFile)
             }
-        } finally {
-            fclose(file)
         }
 
-        return value
+        val fileTemperature = fopen(TemperatureFileName, "r")
+        if (fileTemperature == null) {
+            println("cannot open input file $TemperatureFileName")
+        }else{
+            try {
+                values[1] = memScoped {
+                    val bufferLength = 1024
+                    val buffer = allocArray<ByteVar>(bufferLength)
+                    val line = fgets(buffer, bufferLength, fileTemperature)?.toKString()
+
+                    toScaledNumber(line, 1000f)
+                }
+            } finally {
+                fclose(fileTemperature)
+            }
+
+        }
+
+        return values
     }
+}
+
+fun toScaledNumber(number: String?, scale: Float) : Float? {
+    return if (number != null && number.isNotEmpty()) {
+        if (number.toFloat() != 0f) {
+            number.toFloat() / scale
+        } else { 0f }
+    } else { null }
 }

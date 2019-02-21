@@ -20,7 +20,7 @@ object TemperatureI2CSensor{
             return null
         }
 
-        var value: Float? = null
+        var value: Float?
 
         try {
             value = memScoped {
@@ -29,9 +29,7 @@ object TemperatureI2CSensor{
                 val line = fgets(buffer, bufferLength, file)?.toKString()
 
                 if (line != null && line.isNotEmpty()) {
-                    val tmpValue = line.trim().toFloat() / 1000f
-                    println(" temp: $tmpValue")
-                    value
+                    return line.trim().toFloat() / 1000f
                 }else null
             }
         } finally {

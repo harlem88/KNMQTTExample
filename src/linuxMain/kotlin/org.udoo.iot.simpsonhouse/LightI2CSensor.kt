@@ -20,7 +20,7 @@ object LightI2CSensor{
             return null
         }
 
-        var value: Int? = null
+        var value: Int?
 
         try {
             value = memScoped {
@@ -29,9 +29,7 @@ object LightI2CSensor{
                 val line = fgets(buffer, bufferLength, file)?.toKString()
 
                 if (line != null && line.isNotEmpty()) {
-                    val tmpValue = line.trim().toInt()
-                    println(" temp: $tmpValue")
-                    value
+                    return line.trim().toInt()
                 }else null
             }
         } finally {

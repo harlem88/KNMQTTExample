@@ -3,9 +3,6 @@ package org.udoo.iot.simpsonhouse
 import kotlinx.cinterop.*
 import libpahomqtt.*
 import platform.posix.NULL
-import kotlin.native.concurrent.Future
-import kotlin.native.concurrent.TransferMode
-import kotlin.native.concurrent.Worker
 
 
 private const val URI  = "tcp://"
@@ -17,9 +14,9 @@ private const val PORT     = 1883
 
 class PahoMqttClient {
     private val mqttClient: MQTTClientVar = nativeHeap.alloc()
-    private val worker: Worker by lazy { Worker.start() }
 
     fun connect(ip: String) {
+
         memScoped {
 
             val serverURI = "$URI$ip:$PORT"
@@ -38,6 +35,8 @@ class PahoMqttClient {
             connOpts.keepAliveInterval = 20
             connOpts.cleansession = 1
 
+//            MQTTClient_setCallbacks(mqttClient.value, NULL, staticCFunction(::connectionLost), staticCFunction(::msgarrvd), staticCFunction(::delivered))
+
             println("===== MQTTClient_connecting to $serverURI =======")
             rc = MQTTClient_connect(mqttClient.value, connOpts.ptr)
 
@@ -50,32 +49,25 @@ class PahoMqttClient {
     }
 
 
-    fun publish(futureSensorEvent: Future<ByteArray>?) {
-        worker.execute(TransferMode.SAFE, {
-            Event(mqttClient, futureSensorEvent)}) { event -> {
-            event.futureSensor?.consume { sensors ->
-                println("sensor ======== ${sensors.stringFromUtf8()}")
-//                publish(event.mqttClient, sensors.stringFromUtf8())
+    fun publish(topic: String, message: String){
+
+        val connected = MQTTClient_isConnected(mqttClient.value) > 0
+        if( connected ){
+            memScoped {
+
+                val buffer = message.cstr
+
+                val pubMsg : MQTTClient_message = mqttClient_message_initializer().ptr.pointed
+                val token : MQTTClient_deliveryTokenVar = alloc()
+
+                pubMsg.payload = buffer.ptr
+                pubMsg.payloadlen = buffer.size
+                pubMsg.qos = QOS
+                pubMsg.retained = 0
+
+                MQTTClient_publishMessage(mqttClient.value, topic, pubMsg.ptr, token.ptr)
+                println("to publish on $topic message: $message")
             }
-        }
-        }
-    }
-
-    fun publish(message: String, topic: String){
-        memScoped {
-            val buffer = message.toUtf8().toCValues()
-
-            val pubMsg : MQTTClient_message = mqttClient_message_initializer().ptr.pointed
-            var token : MQTTClient_deliveryTokenVar = alloc()
-
-            pubMsg.payload = buffer.ptr
-            pubMsg.payloadlen = buffer.size
-            pubMsg.qos = QOS
-            pubMsg.retained = 0
-            MQTTClient_publishMessage(mqttClient.ptr, topic, pubMsg.ptr, token.ptr)
-
-            val rc = MQTTClient_waitForCompletion(mqttClient.ptr, token.value, TIMEOUT.toUInt())
-            println("$rc: Message with delivery token %d delivered ${token.value}")
         }
     }
 
@@ -83,25 +75,5 @@ class PahoMqttClient {
 
         MQTTClient_disconnect(mqttClient.ptr, 10000)
         MQTTClient_destroy(mqttClient.ptr)
-    }
-
-    data class Event(val mqttClient: MQTTClientVar , val futureSensor: Future<ByteArray>?)
-}
-
-fun publish(mqttClient: MQTTClientVar, message: String){
-    memScoped {
-        val buffer = message.toUtf8().toCValues()
-
-        val pubMsg : MQTTClient_message = mqttClient_message_initializer().ptr.pointed
-        var token : MQTTClient_deliveryTokenVar = alloc()
-
-        pubMsg.payload = buffer.ptr
-        pubMsg.payloadlen = buffer.size
-        pubMsg.qos = QOS
-        pubMsg.retained = 0
-        MQTTClient_publishMessage(mqttClient.ptr, TOPIC, pubMsg.ptr, token.ptr)
-
-        val rc = MQTTClient_waitForCompletion(mqttClient.ptr, token.value, TIMEOUT.toUInt())
-        println("$rc: Message with delivery token %d delivered ${token.value}")
     }
 }
